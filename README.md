@@ -1,8 +1,20 @@
-# <img src="./images/icon.svg" alt="Ripple" height="30"/>Ripple
+# XRPspec - Behavior driven workflow test framework for XRPL
 
-This repository demostrate the xHookControl implementation on Ripple.
+## Table of Contents
 
-## Directory structure
+1. [Description](#description)
+1. [Beginning with XRPspec](#Beginning with XRPspec)
+1. [Limitations - OS compatibility, etc.](#limitations)
+
+## Description
+
+This repository contain Test spec implementation for Ripple - XRPspec, uses the XhookControl framework. The tools develop on top of xHookControl framework with the objective to make the test scenario and test cases predictable, simpler and more efficient in any test phases.
+
+The tools generate testing insight and outcome reports after integrated in Git action or any CI tools each time a Git changes committed.
+
+A XRPspec CLI allow developer to prepare `well defined` test spec that will collect, inspect API result and evaluate XRP account, ledger transaction, data types and metadata to ensure build was in expected results.
+
+### Directory structure
 
 ```text
 .
@@ -12,20 +24,11 @@ This repository demostrate the xHookControl implementation on Ripple.
 ├── _helpers                  # helpers lib
 │  └── steps_helper.js           # Step helpers library
 ├── steps                     # subdirectory for execution steps
-│  └── <StepName>                # rename this to your own step's name
+│  └── xrpspec                # XRPspec folder
 |     ├── README.md              # detail about how to use this step
-│     ├── <StepName>.js          # entrypoint script (plus any additional files)
+│     ├── ripple-xrpspec.js        # entrypoint script for XRPspec implementation
       ├── icon.png/svg             # picture of workflow graph from app
 │     └── step.yaml              # step metadata 
-├── triggers                  # subdirectory for triggers
-│  └── <TriggerName>             # rename this to your trigger's name
-|     ├── README.md              # detail about how to use this trigger
-│     ├── <TriggerName>.py       # Entrypoint webhook handler script
-│     └── trigger.yaml           # trigger metadata
-├── templates                 # mustache templating for WebAssembly creation
-|  ├── README.md                 # detail about how to use this trigger
-│  ├── <StepName1>.mustache      # ... 
-│  └── <StepName2>.mustache      # trigger metadata
 ├── accounts                  # inline accounts
 │  └── sg_backlists.csv         # accounts uses in workflows or templating
 └── workflows                 # subdirectory for example workflows
@@ -35,32 +38,58 @@ This repository demostrate the xHookControl implementation on Ripple.
       └── WorkflowName.yaml        # the workflow itself
 ```
 
-## Reserved keywords
+## Beginning with XRPspec
 
-- parameters
-- secrets
-- output
-- hookname
-- step
-- workflow
+XRP test spec uses the JEST(Javascript testing) library and associate the necessary XRPL API, object and metadata to make the test simplier to define. A quick way to define the XRPspec, using spec.yaml file.
 
-## Contributing
+Test spec defination.
 
-### Issues
+```text
+  [test_case_name]:
+    step: ripple-xrpspec   <-- indicate XRPspec params
+    parameters:
+      assertion: [assertion]    <--- assertion
+      object: [inspected_object]   <--- inspected_object
+      value: [expected_value]  <---  expected_value
+```
 
-Feel free to submit issues and enhancement requests.
+A example of Payment transactions test spec.
 
-### Contributing Code
-
-In general, we follow the "fork-and-pull" Git workflow.
-
- 1. **Fork** the repo on GitHub
- 2. **Clone** the project to your own machine
- 3. **Commit** changes to your own branch
- 4. **Push** your work back up to your fork
- 5. Submit a **Pull request** so that we can review your changes
-
-NOTE: Be sure to merge the latest from "upstream" before making a pull request!
+```yaml
+---
+  ## Load Source account object <-- this will not be necessary after XRPspec refer to objects and will automatically loaded.
+  account_info_01_post:
+    dependsOn: pay01
+    step: ripple-account_info
+    delay: 5
+  ## Load Target account object
+  account_info_02_post:
+    dependsOn: account_info_01_post
+    step: ripple-account_info
+    delay: 5
+    parameters:
+      account: rGjtrRRicdDhv8DGXNmr1TJhiDxSe6392K
+  cal_source_balance:
+    step: ripple-accept
+    dependsOn: account_info_01_post
+    parameters:
+      amount: ?[$[steps.account_info_01.outputs.Balance] - $[steps.pay01.parameters.amount]]
+  ## XRPspec
+  inspect_source_account:
+    step: ripple-xrpspec
+    dependsOn: cal_source_balance
+    parameters:
+      assertion: toEqual
+      object: $[steps.account_info_01_post.outputs.Balance] # <--- will autoload object
+      value: ?[$[steps.cal_source_balance.parameters.amount] - $[steps.pay01.outputs.result.tx_json.Fee]]
+  inspect_target_account:
+    step: ripple-xrpspec
+    dependsOn: inspect_source_account
+    parameters:
+      assertion: toEqual
+      object: $[steps.account_info_02_post.outputs.Balance] # <--- will autoload object
+      value: ?[$[steps.account_info_02.outputs.Balance] + $[steps.pay01.parameters.amount]]
+```
 
 ### License
 
